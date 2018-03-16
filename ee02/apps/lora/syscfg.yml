@@ -1,0 +1,13 @@
+syscfg.defs:
+
+syscfg.vals:
+    CONSOLE_UART: 0
+    CONSOLE_RTT: 1
+    UART_0:  1
+    UART_0_PIN_TX: 7
+    UART_0_PIN_RX: 8
+    UART_0_PIN_RTS: -1
+    UART_0_PIN_CTS: -1
+
+    ORIGIN_GPS_OFB: 1
+    

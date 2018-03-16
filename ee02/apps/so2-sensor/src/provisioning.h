@@ -1,0 +1,10 @@
+#pragma once
+
+/* ==========================================================================
+	* OTAA provisioning. This includes the device EUI, application EUI and
+	* application key. The application and network session keys will be
+	* negotiated when the device joins the network.
+	* ========================================================================== */
+#define LORAWAN_DEVICE_EUI { 0x00, 0x09, 0x09, 0x00, 0x00, 0x01, 0x51, 0x4b }
+#define LORAWAN_APP_KEY { 0xde, 0x49, 0x40, 0xd0, 0x5f, 0x9e, 0x10, 0x2d, 0x7d, 0x7a, 0x75, 0xfa, 0x12, 0x95, 0x0e, 0xa7 }
+#define LORAWAN_APP_EUI { 0x00, 0x09, 0x09, 0x00, 0x00, 0x00, 0x03, 0x56 }

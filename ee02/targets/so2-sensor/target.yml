@@ -1,0 +1,4 @@
+### Target: targets/so2-sensor
+target.app: "apps/so2-sensor"
+target.bsp: "@apache-mynewt-core/hw/bsp/telee02"
+target.build_profile: "debug"
