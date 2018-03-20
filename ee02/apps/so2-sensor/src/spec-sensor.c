@@ -67,8 +67,8 @@ static void AddSampleToPayload(char * buffer)
     if (token == 0)
         return;
     ppb = atoi(token);
-    if (ppb < 0)
-        ppb = 0;
+//    if (ppb < 0)
+//        ppb = 0;
     token = strtok(NULL, separator);
     if (token == 0)
         return;
