@@ -1,0 +1,25 @@
+syscfg.defs:
+    ADC_0:
+        description: 'TBD'
+        value:  1
+    ADC_0_RESOLUTION:
+        description: 'TBD'
+        value: 'SAADC_CONFIG_RESOLUTION'
+    ADC_0_OVERSAMPLE:
+        description: 'TBD'
+        value: 'SAADC_CONFIG_OVERSAMPLE'
+    ADC_0_INTERRUPT_PRIORITY:
+        description: 'TBD'
+        value: 'SAADC_CONFIG_IRQ_PRIORITY'
+        
+syscfg.vals:
+    CONSOLE_UART: 0
+    CONSOLE_RTT: 1
+
+    I2C_1: 1
+   
+    LORA_MAC_TIMER_NUM: 1
+    LORA_NODE_FREQ_BAND: 868
+
+    TIMER_1: 1
+    
