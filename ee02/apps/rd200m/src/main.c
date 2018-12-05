@@ -28,7 +28,10 @@
 #include "mcu/mcu_sim.h"
 #endif
 #include "console/console.h"
-#include "rd200m.h"
+#include "rd200m_task.h"
+#include "lora_task.h"
+#include "battery_status_task.h"
+#include "load_switch.h"
 
 
 /**
@@ -51,12 +54,9 @@ main(int argc, char **argv)
     sysinit();
 
 
-    init_rd200m_sensor();
-
-    int RDMBoostEnablePin = 30;
-    int RDMPowerEnablePin = 17;
-    hal_gpio_init_out(RDMBoostEnablePin, 1);
-    hal_gpio_init_out(RDMPowerEnablePin, 1);
+    init_rd200m_sensor_task();
+    init_battery_status_task();
+    init_load_switch();
 
     console_printf("Running event loop\n");
     while (1) {

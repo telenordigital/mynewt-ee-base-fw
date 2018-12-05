@@ -22,16 +22,26 @@
 #include "console/console.h"
 #include "os/os.h"
 #include "hal/hal_os_tick.h"
-#include "rd200m.h"
+#include "rd200m_task.h"
 #include <string.h>
+#include "payload.h"
+#include "load_switch.h"
+#include <hal/hal_watchdog.h>
 
 #define SENSOR_BUFFER_SIZE 512
+
+uint8_t rdm200_status;
+uint8_t rdm200_minutes;
+uint8_t rdm200_integer;
+uint8_t rdm200_decimal;
+uint8_t rdm200_checksum;
 
 static char rxBuffer[SENSOR_BUFFER_SIZE];
 //static char txBuffer[SENSOR_BUFFER_SIZE];
 static uint8_t rxPos = 0;
 
-const uint32_t rd200m_sensor_time_interval = 30 * OS_TICKS_PER_SEC;
+//const uint32_t rd200m_sensor_time_interval = 60 * 60 * OS_TICKS_PER_SEC;
+const uint32_t rd200m_sensor_time_interval = 60 * OS_TICKS_PER_SEC;
 static struct os_callout rd200m_sensor_callout;
 
 static uint8_t REQUEST[4] = { 0x02, 0x01, 0x00, 0xFE};
@@ -79,11 +89,11 @@ void setDataTransferPeriodRDM()
 
 static int rxData(void *arg, uint8_t data)
 {
-    console_printf("\n");
+    //console_printf("\n");
     rxBuffer[rxPos] = data;
     rxPos++;
 
-    console_printf("%02X", data);
+    //console_printf("%02X", data);
     if (rxPos > 7)
     {
         console_printf("Received frame.\n");
@@ -93,23 +103,23 @@ static int rxData(void *arg, uint8_t data)
             return -1;
         if (rxBuffer[2] != 0x04)
             return -1;
-        int status = rxBuffer[3];
+        rdm200_status = rxBuffer[3];
         if (rxBuffer[3] == 0xE0) {
             console_printf("HANDS OFF!\n");
             return -1;
         }
-        int minutes = rxBuffer[4];
-        int integer = rxBuffer[5];
-        int decimal = rxBuffer[6];
-        int checksum = rxBuffer[7];
+        rdm200_minutes = rxBuffer[4];
+        rdm200_integer = rxBuffer[5];
+        rdm200_decimal = rxBuffer[6];
+        rdm200_checksum = rxBuffer[7];
 
-        if (checksum != 0xFF- (0x10+0x04+status+minutes+integer+decimal))
+        if (rdm200_checksum != 0xFF- (0x10+0x04+rdm200_status + rdm200_minutes + rdm200_integer + rdm200_decimal))
         {
             console_printf("Incorrect checksum. Discarding frame.\n");
             return -1;
         }
 
-        console_printf("Status: %d, Minutes: %d, Value: %d.%d\n", status, minutes, integer, decimal);
+        console_printf("Status: %d, Minutes: %d, Value: %d.%d\n", rdm200_status, rdm200_minutes, rdm200_integer, rdm200_decimal);
         rxPos = 0;
     }
     if (rxPos >= SENSOR_BUFFER_SIZE) {
@@ -138,24 +148,37 @@ static void InitUART()
 
 static void reset_rd200m_sensor_callout() {
     console_printf("Reset callout...\n");
-    
+
     int err = os_callout_reset(&rd200m_sensor_callout, rd200m_sensor_time_interval);
     if (err != OS_OK) {
         console_printf("rd200m_sensor os_callout_reset error: %d\n", err);
     }
     
-    setDataTransferPeriodRDM();
-    requestDataRDM();    
 }
+
 
 static void rd200m_sensor_event_callback(struct os_event* event) 
 {
     console_printf("rd200m_sensor_event_callback.\n");
    
+    console_printf("Powering on...\n");
+    powerOn();
+    os_time_delay(OS_TICKS_PER_SEC*2);
+    for (int i=0; i<30; i++) {
+        setDataTransferPeriodRDM();
+        requestDataRDM();    
+        for (int j=0; j<10; j++) {
+            os_time_delay(OS_TICKS_PER_SEC*6);
+            hal_watchdog_tickle();
+        }
+    }
+    console_printf("Powering off...\n");
+    powerOff();
+
     reset_rd200m_sensor_callout();
 }
 
-void init_rd200m_sensor() {
+void init_rd200m_sensor_task() {
     console_printf("--- RD200M sensor init ---\n");
 
     InitUART();
