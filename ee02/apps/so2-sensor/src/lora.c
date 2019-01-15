@@ -23,8 +23,16 @@
 #include "console/console.h"
 #include "node/mac/LoRaMacTest.h"
 #include "os/os.h"
+#include "console/console.h"
+#include "scheduling.h"
 
+uint8_t lora_payload[SENSOR_PAYLOAD_SIZE];
+uint8_t payloadIndex = 0;
 
+extern int battery_voltage_mv;
+extern int32_t sensor_ppb;
+extern uint8_t sensor_temp;
+extern uint8_t sensor_rh;
 
 typedef enum {
     DISCONNECTED = 0,
@@ -38,8 +46,7 @@ static uint8_t DevEui[] = LORAWAN_DEVICE_EUI;
 static uint8_t AppEui[] = LORAWAN_APP_EUI;
 static uint8_t AppKey[] = LORAWAN_APP_KEY;
 
-// Transmit once every 5 minutes
-const uint32_t lora_time_interval = 300 * OS_TICKS_PER_SEC;
+const uint32_t lora_time_interval = LORA_TRANSMIT_DELAY * OS_TICKS_PER_SEC;
 static struct os_callout lora_callout;
 
 static void reset_lora_callout() {
@@ -55,6 +62,20 @@ extern uint8_t payloadIndex;
 static void lora_event_callback(struct os_event* event) {
     console_printf("Sending ping\n");
     
+    payloadIndex = 0;
+    lora_payload[payloadIndex++] = (sensor_ppb & 0xFF000000) >> 24;
+    lora_payload[payloadIndex++] = (sensor_ppb & 0x00FF0000) >> 16;
+    lora_payload[payloadIndex++] = (sensor_ppb & 0x0000FF00) >> 8;
+    lora_payload[payloadIndex++] = (sensor_ppb & 0x000000FF);
+    lora_payload[payloadIndex++] = sensor_temp;
+    lora_payload[payloadIndex++] = sensor_rh;
+    lora_payload[payloadIndex++] = (battery_voltage_mv & 0xFF000000) >> 24;
+    lora_payload[payloadIndex++] = (battery_voltage_mv & 0x00FF0000) >> 16;
+    lora_payload[payloadIndex++] = (battery_voltage_mv & 0x0000FF00) >> 8;
+    lora_payload[payloadIndex++] = (battery_voltage_mv & 0x000000FF);        
+
+    console_printf("Transmitting sample: PPB:%ld, Temp:%d, RH: %d. Battery voltage: %d mV\n", sensor_ppb, sensor_temp, sensor_rh, battery_voltage_mv);
+
     lora_send(&lora_payload[0], payloadIndex);
     payloadIndex = 0;
 

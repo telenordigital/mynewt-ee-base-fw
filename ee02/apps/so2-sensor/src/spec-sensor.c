@@ -25,17 +25,19 @@
 #include "hal/hal_os_tick.h"
 #include "spec-sensor.h"
 #include <string.h>
+#include "scheduling.h"
 
 #define SENSOR_BUFFER_SIZE 512
 
-uint8_t lora_payload[SENSOR_PAYLOAD_SIZE];
-uint8_t payloadIndex = 0;
+int32_t sensor_ppb;
+uint8_t sensor_temp;
+uint8_t sensor_rh;
 
 static char rxBuffer[SENSOR_BUFFER_SIZE];
 static char txBuffer[SENSOR_BUFFER_SIZE];
 static uint8_t buffer_pos = 0;
 
-const uint32_t spec_sensor_time_interval = 60 * OS_TICKS_PER_SEC;
+const uint32_t spec_sensor_time_interval = SENSOR_RUNNING_DELAY * OS_TICKS_PER_SEC;
 static struct os_callout spec_sensor_callout;
 
 static int charcount = 1;
@@ -49,44 +51,29 @@ static int TXChar() {
     return -1;
 }
 
-static void AddSampleToPayload(char * buffer) 
+static void DecodeBuffer(char * buffer) 
 {
 //    console_printf("Buffer: %s\n", buffer);
 
-    console_printf("Payload index: %d\n", payloadIndex);
     const char separator[2] = ",";
     char * token = strtok(buffer, separator);
-
-    int16_t ppb;
-    uint8_t temp;
-    uint8_t rh;
 
     if (token == 0)
         return;
     token = strtok(NULL, separator);
     if (token == 0)
         return;
-    ppb = atoi(token);
+    sensor_ppb = atol(token);
 //    if (ppb < 0)
 //        ppb = 0;
     token = strtok(NULL, separator);
     if (token == 0)
         return;
-    temp = atoi(token);
+    sensor_temp = atoi(token);
     token = strtok(NULL, separator);
     if (token == 0)
         return;
-    rh = atoi(token);
-
-    if (payloadIndex < SENSOR_PAYLOAD_SIZE-4) {
-        // payloadIndex is reset by lora Tx
-        lora_payload[payloadIndex++] = ppb & 0xFF00 >> 8;
-        lora_payload[payloadIndex++] = (uint8_t)(ppb & 0xFF00);
-        lora_payload[payloadIndex++] = temp;
-        lora_payload[payloadIndex++] = rh;
-    }
-
-    console_printf("Sample: PPB:%d, Temp:%d, RH: %d\n", ppb, temp, rh);
+    sensor_rh = atoi(token);
 }
 
 
@@ -103,8 +90,7 @@ static int rxData(void *arg, uint8_t data)
     if (data == '\n') {
         buffer_pos = 0;
         memcpy(txBuffer, rxBuffer, SENSOR_BUFFER_SIZE);
-
-        AddSampleToPayload(rxBuffer);
+        DecodeBuffer(rxBuffer);
         memset(rxBuffer, 0, SENSOR_BUFFER_SIZE);
 
         hal_uart_close(0);

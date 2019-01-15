@@ -30,6 +30,7 @@
 #include "spec-sensor.h"
 #include "hal/hal_os_tick.h"
 #include "console/console.h"
+#include "adc.h"
 
 
 int main(int argc, char **argv)
@@ -42,16 +43,22 @@ int main(int argc, char **argv)
 
     sysinit();
 
-    console_printf("SO2 application\n");
+    console_printf("CO/SO2 application\n");
+
+    // For some reason this isn't set correctly in the BSP'
+    // evt sett denne før sending.
+    hal_gpio_init_out(SX1276_ANT_HF_CTRL, 1);
 
     init_lora();
     init_spec_sensor();
+    init_adc_task();
 
     while (1) {
         os_eventq_run(os_eventq_dflt_get());
         os_time_delay(OS_TICKS_PER_SEC*5);
     }
     assert(0);
+    
 
     return rc;
 }

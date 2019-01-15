@@ -30,3 +30,4 @@ pkg.deps:
     - "@apache-mynewt-core/sys/console/full"
     - "@apache-mynewt-core/net/lora/node"
     - "@apache-mynewt-core/sys/stats/full"
+    - "@mynewt_nordic/hw/drivers/adc/adc_nrf52"
