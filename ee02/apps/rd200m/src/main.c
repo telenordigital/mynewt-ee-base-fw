@@ -30,8 +30,8 @@
 #include "console/console.h"
 #include "rd200m_task.h"
 #include "lora_task.h"
-#include "battery_status_task.h"
 #include "load_switch.h"
+#include "battery_status_task.h"
 
 
 /**
@@ -53,10 +53,13 @@ main(int argc, char **argv)
 
     sysinit();
 
+    console_printf("-------------RD200M-------------");
+    hal_gpio_init_out(SX1276_ANT_HF_CTRL, 1);
 
-    init_rd200m_sensor_task();
-    init_battery_status_task();
     init_load_switch();
+    init_rd200m_sensor_task();
+    init_adc_task();
+    init_lora_task();
 
     console_printf("Running event loop\n");
     while (1) {

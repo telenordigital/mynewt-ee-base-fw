@@ -9,10 +9,16 @@
 #include "nrf_drv_saadc.h"
 #include "console/console.h"
 #include "bsp.h"
+#include "scheduling.h"
 
 
 #define ADC_NUMBER_SAMPLES (2)
 #define ADC_NUMBER_CHANNELS (1)
+
+
+const uint32_t adc_time_interval = ADC_TASK_DELAY * OS_TICKS_PER_SEC;
+static struct os_callout adc_callout;
+struct adc_dev *adc;
 
 /* ADC Task settings */
 #define ADC_TASK_PRIO           5
@@ -27,7 +33,7 @@ struct adc_dev *adc;
 uint8_t *sample_buffer1;
 uint8_t *sample_buffer2;
 
-int my_result_mv = 0;
+int battery_voltage_mv = 0;
 
 static struct adc_dev os_bsp_adc0;
 static nrf_drv_saadc_config_t os_bsp_adc0_config = {
@@ -36,34 +42,39 @@ static nrf_drv_saadc_config_t os_bsp_adc0_config = {
     .interrupt_priority = MYNEWT_VAL(ADC_0_INTERRUPT_PRIORITY),
 };
 
+int adc_read(void *buffer, int buffer_len)
+{
+    //console_printf("ADC Read...\n");
+
+    int i;
+    int adc_result;
+    int rc;
+    int voltage_mv;
+    for (i = 0; i < ADC_NUMBER_SAMPLES; i++) {
+        rc = adc_buf_read(adc, buffer, buffer_len, i, &adc_result);
+        if (rc != 0) {
+            goto err;
+        }
+        voltage_mv = adc_result_mv(adc, 0, adc_result);
+        //console_printf("Sample: %d\n", i);
+    }        
+    adc_buf_release(adc, buffer, buffer_len);
+    return voltage_mv;
+err:
+    console_printf("ADC error\n");
+    return (rc);
+}
 
 int
 adc_read_event(struct adc_dev *dev, void *arg, uint8_t etype, void *buffer, int buffer_len)
 {
-    int value;
-    value = adc_read(buffer, buffer_len);
-    if (value >= 0) {
-        console_printf("Got %d\n", value);
+    battery_voltage_mv = 2 * adc_read(buffer, buffer_len); 
+    if (battery_voltage_mv >= 0) {
+        console_printf("Voltage %d mV\n", battery_voltage_mv);
     } else {
-        console_printf("Error while reading: %d\n", value);
+        console_printf("Error while reading: %d\n", battery_voltage_mv);
     }
     return (0);
-}
-
-static void adc_task_handler(void *unused)
-{
-    console_printf("ADC task...\n");
-    struct adc_dev *adc;
-    int rc;
-    /* ADC init */
-    adc = adc_init();
-    rc = adc_event_handler_set(adc, adc_read_event, (void *) NULL);
-    assert(rc == 0);
-    while (1) {
-        adc_sample(adc);
-        /* Wait 2 second */
-       os_time_delay(OS_TICKS_PER_SEC * 2);
-    }
 }
 
 void * adc_init(void)
@@ -86,47 +97,37 @@ void * adc_init(void)
     memset(sample_buffer1, 0, adc_buf_size(adc, ADC_NUMBER_CHANNELS, ADC_NUMBER_SAMPLES));
     memset(sample_buffer2, 0, adc_buf_size(adc, ADC_NUMBER_CHANNELS, ADC_NUMBER_SAMPLES));
     adc_buf_set(adc, sample_buffer1, sample_buffer2,
-        adc_buf_size(adc, ADC_NUMBER_CHANNELS, ADC_NUMBER_SAMPLES));
+    adc_buf_size(adc, ADC_NUMBER_CHANNELS, ADC_NUMBER_SAMPLES));
 
     return adc;
 }
- 
-void init_battery_status_task()
-{
-    /* Initialize adc sensor task eventq */
-    os_eventq_init(&adc_evq);
 
-    /* Create the ADC reader task.  
-     * All sensor operations are performed in this task.
-     */
-    os_task_init(&adc_task, "sensor", adc_task_handler,
-            NULL, ADC_TASK_PRIO, OS_WAIT_FOREVER,
-            adc_stack, ADC_STACK_SIZE);
+static void reset_adc_callout() {
+    int err = os_callout_reset(&adc_callout, adc_time_interval);
+    if (err != OS_OK) {
+        console_printf("adc0 os_callout_reset error: %d\n", err);
+    }
+    
 }
 
 
-int
-adc_read(void *buffer, int buffer_len)
+static void adc_event_callback(struct os_event* event) 
 {
-    console_printf("ADC Read...\n");
+    adc_sample(adc);
 
-    int i;
-    int adc_result;
+    reset_adc_callout();
+}
+
+void init_adc_task() {
+    console_printf("--- ADC init ---\n");
+
+    adc = adc_init();
     int rc;
-    for (i = 0; i < ADC_NUMBER_SAMPLES; i++) {
-        rc = adc_buf_read(adc, buffer, buffer_len, i, &adc_result);
-        if (rc != 0) {
-            goto err;
-        }
-        my_result_mv = adc_result_mv(adc, 0, adc_result);
-        console_printf("Sample: %d\n", i);
-    }        
-    adc_buf_release(adc, buffer, buffer_len);
-    return my_result_mv;
-err:
-    console_printf("ADC error\n");
-    return (rc);
-}
+    rc = adc_event_handler_set(adc, adc_read_event, (void *) NULL);
+    assert(rc == 0);
+    os_callout_init(&adc_callout, os_eventq_dflt_get(), adc_event_callback, NULL);
+    reset_adc_callout();
+ }
 
 
 

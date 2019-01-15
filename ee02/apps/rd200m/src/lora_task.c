@@ -24,8 +24,7 @@
 #include "node/mac/LoRaMacTest.h"
 #include "os/os.h"
 #include "payload.h"
-
-
+#include "scheduling.h"
 
 typedef enum {
     DISCONNECTED = 0,
@@ -39,8 +38,10 @@ static uint8_t DevEui[] = LORAWAN_DEVICE_EUI;
 static uint8_t AppEui[] = LORAWAN_APP_EUI;
 static uint8_t AppKey[] = LORAWAN_APP_KEY;
 
-// Transmit once every 5 minutes
-const uint32_t lora_time_interval = 300 * OS_TICKS_PER_SEC;
+uint32_t transmit_counter = 0;
+uint32_t lora_time_interval = LORA_STARTUP_DELAY * OS_TICKS_PER_SEC;
+uint32_t SET_UP_DIAGNOSTIC_TRANSMISSIONS = 10;
+
 static struct os_callout lora_callout;
 
 static void reset_lora_callout() {
@@ -57,7 +58,7 @@ extern uint8_t rdm200_minutes;
 extern uint8_t rdm200_integer;
 extern uint8_t rdm200_decimal;
 extern uint8_t rdm200_checksum;
-extern int my_result_mv;
+extern int battery_voltage_mv;
 
 static void lora_event_callback(struct os_event* event) {
     console_printf("Sending payload\n");
@@ -67,13 +68,24 @@ static void lora_event_callback(struct os_event* event) {
     lora_payload[payloadIndex++] = rdm200_integer;
     lora_payload[payloadIndex++] = rdm200_decimal;
     lora_payload[payloadIndex++] = rdm200_checksum;
-    lora_payload[payloadIndex++] = (my_result_mv & 0xFF000000) >> 24;
-    lora_payload[payloadIndex++] = (my_result_mv & 0x00FF0000) >> 16;
-    lora_payload[payloadIndex++] = (my_result_mv & 0x0000FF00) >> 8;
-    lora_payload[payloadIndex++] = (my_result_mv & 0x000000FF);
+    lora_payload[payloadIndex++] = (battery_voltage_mv & 0xFF000000) >> 24;
+    lora_payload[payloadIndex++] = (battery_voltage_mv & 0x00FF0000) >> 16;
+    lora_payload[payloadIndex++] = (battery_voltage_mv & 0x0000FF00) >> 8;
+    lora_payload[payloadIndex++] = (battery_voltage_mv & 0x000000FF);
     
+    console_printf("PACKING PAYLOAD: Status: %d, Minutes: %d, Value: %d.%d. Battery: %d\n", rdm200_status, rdm200_minutes, rdm200_integer, rdm200_decimal, battery_voltage_mv);
+    console_printf("ENCODED PAYLOAD: %02X %02X %02X %02X %02X %02X %02X %02X %02X\n", lora_payload[0], lora_payload[1], lora_payload[2], lora_payload[3], lora_payload[4], lora_payload[5], lora_payload[6], lora_payload[7], lora_payload[8]);
+
     lora_send(&lora_payload[0], payloadIndex);
     payloadIndex = 0;
+
+    // To make life easier for us when deploying, we'll transmit a bit more frequently just after poweron
+    // After a while, we will fall back to RADON_SENSOR_RUNNING_DELAY * OS_TICKS_PER_SEC seconds between transmissions
+    transmit_counter++; // Nope. This will not wrap around before the battery runs out.
+    if (transmit_counter > SET_UP_DIAGNOSTIC_TRANSMISSIONS)
+    {
+        lora_time_interval = LORA_RUNNING_DELAY * OS_TICKS_PER_SEC; 
+    }
 
     reset_lora_callout();
 }
@@ -185,6 +197,10 @@ void lora_send(const void* data, int len) {
     }
 
     console_printf("Sending LoRa packet...\n");
+
+    // const uint8_t * p = data;
+    // console_printf("Sent payload: %02X %02X %02X %02X %02X %02X %02X %02X %02X\n", *p, *(p+1), *(p+2), *(p+3), *(p+4), *(p+5), *(p+6), *(p+7), *(p+8));
+
     state = SENDING;
     os_callout_init(&lora_callout, os_eventq_dflt_get(), lora_event_callback, NULL);
     reset_lora_callout();

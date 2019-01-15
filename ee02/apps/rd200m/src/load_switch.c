@@ -4,7 +4,7 @@
 
 void init_load_switch()
 {
-    console_printf("--------------- ENABLE/DISABLE power to RD200M -----------");
+    console_printf("--------------- ENABLE/DISABLE power to RD200M -----------\n");
     powerOff();
 }
 

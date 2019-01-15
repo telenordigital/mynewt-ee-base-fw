@@ -27,6 +27,7 @@
 #include "payload.h"
 #include "load_switch.h"
 #include <hal/hal_watchdog.h>
+#include "scheduling.h"
 
 #define SENSOR_BUFFER_SIZE 512
 
@@ -36,12 +37,12 @@ uint8_t rdm200_integer;
 uint8_t rdm200_decimal;
 uint8_t rdm200_checksum;
 
+
 static char rxBuffer[SENSOR_BUFFER_SIZE];
 //static char txBuffer[SENSOR_BUFFER_SIZE];
 static uint8_t rxPos = 0;
 
-//const uint32_t rd200m_sensor_time_interval = 60 * 60 * OS_TICKS_PER_SEC;
-const uint32_t rd200m_sensor_time_interval = 60 * OS_TICKS_PER_SEC;
+const uint32_t rd200m_sensor_time_interval = RADON_SENSOR_RUNNING_DELAY * OS_TICKS_PER_SEC;
 static struct os_callout rd200m_sensor_callout;
 
 static uint8_t REQUEST[4] = { 0x02, 0x01, 0x00, 0xFE};
@@ -163,8 +164,10 @@ static void rd200m_sensor_event_callback(struct os_event* event)
    
     console_printf("Powering on...\n");
     powerOn();
-    os_time_delay(OS_TICKS_PER_SEC*2);
-    for (int i=0; i<30; i++) {
+    os_time_delay(OS_TICKS_PER_SEC*5);
+    resetRDM();
+    os_time_delay(OS_TICKS_PER_SEC*10);
+    for (int i=0; i<60; i++) {
         setDataTransferPeriodRDM();
         requestDataRDM();    
         for (int j=0; j<10; j++) {
