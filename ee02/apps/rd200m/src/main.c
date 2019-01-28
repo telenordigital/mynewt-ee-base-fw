@@ -53,7 +53,7 @@ main(int argc, char **argv)
 
     sysinit();
 
-    console_printf("-------------RD200M-------------");
+    console_printf("-------------RD200M-------------\n");
     hal_gpio_init_out(SX1276_ANT_HF_CTRL, 1);
 
     init_load_switch();
@@ -66,6 +66,7 @@ main(int argc, char **argv)
         os_eventq_run(os_eventq_dflt_get());
         os_time_delay(OS_TICKS_PER_SEC*5);
     }
+
     assert(0);
     return rc;
 }

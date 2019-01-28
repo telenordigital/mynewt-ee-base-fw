@@ -21,11 +21,11 @@ static struct os_callout adc_callout;
 struct adc_dev *adc;
 
 /* ADC Task settings */
-#define ADC_TASK_PRIO           5
-#define ADC_STACK_SIZE          (OS_STACK_ALIGN(336))
-struct os_eventq adc_evq;
-struct os_task adc_task;
-bssnz_t os_stack_t adc_stack[ADC_STACK_SIZE];
+//#define ADC_TASK_PRIO           5
+//#define ADC_STACK_SIZE          (OS_STACK_ALIGN(336))
+//struct os_eventq adc_evq;
+//struct os_task adc_task;
+//bssnz_t os_stack_t adc_stack[ADC_STACK_SIZE];
 
 nrf_drv_saadc_config_t adc_config = NRF_DRV_SAADC_DEFAULT_CONFIG;
 

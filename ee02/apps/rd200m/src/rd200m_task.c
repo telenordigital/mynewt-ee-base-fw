@@ -54,12 +54,14 @@ static uint8_t * cmdPtr  = RESET;
 static int txByte = 0;
 static int TXChar() {
     if (txByte < 4) {
-        console_printf("%02X ", *cmdPtr);
+        int retVal = *cmdPtr; 
+        console_printf("%02X ", retVal);
         txByte++;
         cmdPtr++;
-        return REQUEST[txByte];    
+        return retVal;    
     }
     console_printf("\n");
+    cmdPtr = 0;
     return -1;
 }
 
@@ -94,7 +96,7 @@ static int rxData(void *arg, uint8_t data)
     rxBuffer[rxPos] = data;
     rxPos++;
 
-    //console_printf("%02X", data);
+    //console_printf("RX: %02X (Rxpos:%d)\n", data, rxPos);
     if (rxPos > 7)
     {
         console_printf("Received frame.\n");
@@ -164,14 +166,15 @@ static void rd200m_sensor_event_callback(struct os_event* event)
    
     console_printf("Powering on...\n");
     powerOn();
-    os_time_delay(OS_TICKS_PER_SEC*5);
-    resetRDM();
     os_time_delay(OS_TICKS_PER_SEC*10);
+    setDataTransferPeriodRDM();
+    os_time_delay(OS_TICKS_PER_SEC*1);
+    resetRDM();
+    os_time_delay(OS_TICKS_PER_SEC*1);
     for (int i=0; i<60; i++) {
-        setDataTransferPeriodRDM();
-        requestDataRDM();    
         for (int j=0; j<10; j++) {
             os_time_delay(OS_TICKS_PER_SEC*6);
+            requestDataRDM();    
             hal_watchdog_tickle();
         }
     }
@@ -186,8 +189,8 @@ void init_rd200m_sensor_task() {
 
     InitUART();
 
-    setDataTransferPeriodRDM();
-    resetRDM();
+    // setDataTransferPeriodRDM();
+    // resetRDM();
 
     os_callout_init(&rd200m_sensor_callout, os_eventq_dflt_get(), rd200m_sensor_event_callback, NULL);
     reset_rd200m_sensor_callout();
