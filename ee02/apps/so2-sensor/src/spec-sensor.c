@@ -40,20 +40,23 @@ static uint8_t buffer_pos = 0;
 const uint32_t spec_sensor_time_interval = SENSOR_RUNNING_DELAY * OS_TICKS_PER_SEC;
 static struct os_callout spec_sensor_callout;
 
+char cmdChar;
+
 static int charcount = 1;
 static int TXChar() {
     if (charcount > 0) {
+        console_printf("Transmitting : '%d'\n", cmdChar);
         charcount--;
-        return '\r';    // Don't ask. This turned out to be the elusive "any character" key
-                        // that was necessary to trigger a single measurement from the spec-sensor
-        os_time_delay(OS_TICKS_PER_SEC/2);
+        os_time_delay(OS_TICKS_PER_SEC);
+
+        return cmdChar;    
     }
     return -1;
 }
 
-static void DecodeBuffer(char * buffer) 
+void DecodeBuffer(char * buffer) 
 {
-//    console_printf("Buffer: %s\n", buffer);
+    console_printf("Buffer: %s\n", buffer);
 
     const char separator[2] = ",";
     char * token = strtok(buffer, separator);
@@ -93,14 +96,16 @@ static int rxData(void *arg, uint8_t data)
         DecodeBuffer(rxBuffer);
         memset(rxBuffer, 0, SENSOR_BUFFER_SIZE);
 
-        hal_uart_close(0);
+//        hal_uart_close(0);
     }
     return 0;
 }
 
-static void InitUART()
+void InitUART()
 {
     console_printf("InitUART\n");
+
+    hal_uart_close(0);
     int rc;
 
     rc = hal_uart_init_cbs(0, TXChar, NULL, rxData, NULL);
@@ -114,20 +119,48 @@ static void InitUART()
     }
 }
 
-static void reset_spec_sensor_callout() {
+void reset_spec_sensor_callout() {
     console_printf("reset_spec_sensor_callout\n");
     int err = os_callout_reset(&spec_sensor_callout, spec_sensor_time_interval);
     if (err != OS_OK) {
         console_printf("spec_sensor os_callout_reset error: %d\n", err);
     }
 
-    InitUART();
-    charcount = 1;
+    startSampleData();
+    os_time_delay(OS_TICKS_PER_SEC);
+    startSampleData();
+    os_time_delay(OS_TICKS_PER_SEC);
+    stopSampleData();
     
+}
+
+
+void startSampleData()
+{
+    InitUART();
+
+    charcount = 1;
+    console_printf("Sampling\n");
+    cmdChar = '\r'; 
     hal_uart_start_tx(0);
 }
 
-static void spec_sensor_event_callback(struct os_event* event) {
+
+void stopSampleData()
+{
+    InitUART();
+    charcount = 1;
+    console_printf("Stop sampling\n");
+    os_time_delay(OS_TICKS_PER_SEC);
+    cmdChar = 's';
+    hal_uart_start_tx(0);
+}
+
+
+
+
+
+void spec_sensor_event_callback(struct os_event* event) {
     console_printf("TX BUFFER: %s\n", (char*)txBuffer);
 
     reset_spec_sensor_callout();
@@ -135,6 +168,8 @@ static void spec_sensor_event_callback(struct os_event* event) {
 
 void init_spec_sensor() {
     console_printf("--- Spec sensor init ---\n");
+
+    InitUART();
 
     os_callout_init(&spec_sensor_callout, os_eventq_dflt_get(), spec_sensor_event_callback, NULL);
     reset_spec_sensor_callout();

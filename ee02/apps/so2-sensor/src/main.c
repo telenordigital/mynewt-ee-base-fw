@@ -58,7 +58,6 @@ int main(int argc, char **argv)
         os_time_delay(OS_TICKS_PER_SEC*5);
     }
     assert(0);
-    
 
     return rc;
 }

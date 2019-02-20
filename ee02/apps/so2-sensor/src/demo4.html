@@ -1,0 +1,411 @@
+<!doctype html>
+<html>
+  <header>
+    <meta charset="UTF-8"> 
+  </header>
+  <link rel="stylesheet" href="https://www.w3schools.com/w3css/4/w3.css">
+  <body >
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/2.5.0/Chart.min.js"></script>
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
+
+  <!-- development version, includes helpful console warnings -->
+<script src="https://cdn.jsdelivr.net/npm/vue/dist/vue.js"></script>
+  
+<div id="app">
+    <div class="w3-sidebar w3-bar-block w3-light-grey w3-card" style="width:100px;height:170px">
+        <button class="w3-bar-item w3-button" v-on:click="ShowLevel1">Nivå 1</button>
+        <button class="w3-bar-item w3-button" v-on:click="ShowLevel2">Nivå 2</button>
+        <button class="w3-bar-item w3-button" v-on:click="ShowLevel3">Nivå 3</button>
+        <button class="w3-bar-item w3-button" v-on:click="ShowLevel7">Nivå 7</button>
+        <button class="w3-bar-item w3-bar w3-light-grey "></button>
+    </div>
+
+    <div style ="margin-left:150px">
+     <div id="logo" style="position: absolute; top: 85%; left: 63%;">
+       <img src="maps/img/ThelmaInneklima.png" alt="Thelma Inneklima & Arbeidsmiljø AS">
+     </div>
+
+    <div v-if="displaymap" id="level" class="level" :display="displaymap">
+      <h2>{{heading}}</h2>
+      <p>{{subheading}}</p>
+      <div id="map" style="width: 65%; float: left; position:relative;">
+        <object id="exposureMap" :data="map" type="image/svg+xml"></object>
+      </div>
+
+      <div style="position: absolute; top: 15%; left: 65%;">
+        <sensor 
+            v-if="number_of_sensors > 0"
+            v-bind:url = current_sensor_type1_url
+            v-bind:name = current_sensor_type1.name
+            v-bind:gas = current_sensor_type1.gas
+            v-bind:concentration = current_sensor_reading1.concentration
+            v-bind:temperature = current_sensor_reading1.temperature
+            v-bind:humidity = current_sensor_reading1.humidity
+            v-bind:rssi = current_sensor_reading1.rssi
+            v-bind:battery = current_sensor_reading1.battery         
+            v-bind:timestamp = current_sensor_reading1.timestamp[0]
+        ></sensor>
+        <sensor
+            v-if="number_of_sensors > 1"
+            v-bind:url = current_sensor_type2_url
+            v-bind:name = current_sensor_type2.name
+            v-bind:gas = current_sensor_type2.gas
+            v-bind:concentration = current_sensor_reading2.concentration
+            v-bind:temperature = current_sensor_reading2.temperature
+            v-bind:humidity = current_sensor_reading2.humidity
+            v-bind:rssi = current_sensor_reading2.rssi
+            v-bind:battery = current_sensor_reading2.battery         
+            v-bind:timestamp = current_sensor_reading2.timestamp[0]
+        ></sensor>
+       </div>
+    </div>
+
+
+    <div v-if="displaygraph" id="graph1" class="graph" style="width: 90%;" :display="displaygraph">
+        <canvas id="line-chart1"></canvas>
+    </div>
+</div>
+</div>
+
+
+<script>
+
+
+function getToken()
+{
+  var params = document.location.toString().split("?token=")
+  if ((params.length) != 2)
+    return ""
+  return params[1]
+}
+
+var sensors = [
+   { 
+        name: 'SO2 sensor I',
+        gas: 'SO2',
+        eui: '00-09-09-00-00-01-52-af',
+        bias: 144,  // Clean air response
+    },
+    {
+        name: 'SO2 sensor II',
+        gas: 'SO2',
+        eui: '00-09-09-00-00-01-52-b0',
+        bias: 300,  // Clean air response
+    },
+    {
+        name: 'SO2 sensor III',
+        gas: 'SO2',
+        eui: '00-09-09-00-00-01-52-b1',
+        bias: -326.2,
+    },
+    {
+        name: 'CO sensor I',
+        gas: 'CO',
+        eui: '00-09-09-00-00-01-52-52',
+        bias: -1823.2,
+    },
+    {
+        name: 'CO sensor II',
+        gas: 'CO',
+        eui: '00-09-09-00-00-01-52-54',
+        bias: -3878.2,
+    },
+    {
+        name: 'CO sensor III',
+        gas: 'CO',
+        eui: '00-09-09-00-00-01-52-56',
+        bias: -5500,
+    },
+    {
+        name: 'SO2 testsensor Tyholt',
+        gas: 'SO2',
+        eui: '00-09-09-00-00-01-52-f6',
+        bias: -200,
+    }
+]
+
+
+
+var sensorReading1 = {
+        concentration: 0.0,
+        timestamp: "",
+        temperature: 0,
+        humidity: 0,
+        battery: "TBD",
+        rssi: 0
+}
+
+var sensorReading2 = {
+        concentration: 0.0,
+        timestamp: "",
+        temperature: 0,
+        humidity: 0,
+        battery: "TBD",
+        rssi: 0
+}
+
+
+var vm = new Vue({
+  el: '#app', 
+  data: {
+    heading: '',
+    subheading: '',
+    map: '',
+    displaymap: true,
+    displaygraph: false,
+    number_of_sensors: 0,
+    current_sensor_type1: sensors[0],
+    current_sensor_type1_url: '',
+    current_sensor_reading1: sensorReading1,
+    current_sensor_type2: sensors[1],
+    current_sensor_type2_url: '',
+    current_sensor_reading2: sensorReading2,
+  },
+  methods : {
+    getSensor: function(name)
+    {
+        console.log("Fetching sensor: ", name)
+        for (i=0; i<sensors.length; i++)
+        {
+            if (name == sensors[i].name)
+                return sensors[i]
+        }
+    },
+    getSensorIndex: function(name)
+    {
+        for (i=0; i<sensors.length; i++)
+        {
+            if (name == sensors[i].name)
+                return i
+        }
+    },
+    ShowGraph: function()
+    {
+      this.displaygraph = true
+      this.displaymap = false
+    },
+    ShowMap: function(heading, subheading, map, number_of_sensors)
+    {
+      this.displaygraph = false
+      this.displaymap = true
+      this.heading = heading
+      this.subheading = subheading
+      this.map = 'maps/svg/' + map
+      this.number_of_sensors = number_of_sensors
+    },
+    ShowLevel1: function ()
+    {
+        this.current_sensor_type1 = sensors[this.getSensorIndex('CO sensor III')]
+        this.current_sensor_type2 = sensors[this.getSensorIndex('SO2 sensor II')]
+        this.current_sensor_type1_url = 'javascript:vm.OpenGraph(vm.getSensor(\'CO sensor III\'))',
+        this.current_sensor_type2_url ='javascript:vm.OpenGraph(vm.getSensor(\'SO2 sensor II\'))',
+   
+        fetchMeasurement(this.current_sensor_type1, sensorReading1)
+        fetchMeasurement(this.current_sensor_type2, sensorReading2)
+        this.ShowMap('Nivå 1', 'Kjeller. Slaggutmater linje 2.', 'level1.svg', 2)
+    },
+    ShowLevel2: function ()
+    {
+        this.current_sensor_type1 = sensors[this.getSensorIndex('CO sensor I')]
+        this.current_sensor_type2 = sensors[this.getSensorIndex('SO2 sensor I')]
+        this.current_sensor_type1_url = 'javascript:vm.OpenGraph(vm.getSensor(\'CO sensor I\'))',
+        this.current_sensor_type2_url ='javascript:vm.OpenGraph(vm.getSensor(\'SO2 sensor I\'))',
+        fetchMeasurement(this.current_sensor_type1, sensorReading1)
+        fetchMeasurement(this.current_sensor_type2, sensorReading2)
+        this.ShowMap('Nivå 2', 'Slagglager / kranbane. Linje 1 og 2.', 'level2.svg', 2)
+    },
+    ShowLevel3: function ()
+    {
+        this.current_sensor_type1 = sensors[this.getSensorIndex('CO sensor II')]
+        this.current_sensor_type1_url = 'javascript:vm.OpenGraph(vm.getSensor(\'CO sensor II\'))',
+        fetchMeasurement(this.current_sensor_type1, sensorReading1)
+        this.ShowMap('Nivå 3', 'Asketransport / -kjede (støvtransportør). Linje 2.', 'level3.svg', 1)
+    },
+    ShowLevel7: function ()
+    {
+        this.current_sensor_type1 = sensors[this.getSensorIndex('SO2 sensor III')]
+        this.current_sensor_type1_url = 'javascript:vm.OpenGraph(vm.getSensor(\'SO2 sensor III\'))',
+        fetchMeasurement(this.current_sensor_type1, sensorReading1)
+        this.ShowMap('Nivå 7', 'Asketransport / -kjede. Linje 3.', 'level7.svg', 1)
+    },
+    OpenGraph: function (sensor) {
+       this.ShowGraph()
+
+        if (chart != null) {
+            chart.destroy();
+        }
+
+        var samples = 288
+
+        $.when(getSensorData(sensor.eui, samples)).then(function (s) {
+                labels = s.messages.map(function (element) { timestamp = new Date(element.timestamp)
+                                                return timestamp.toLocaleDateString('no-nb') + " " +
+                                                timestamp.toLocaleTimeString('no-nb') + " " 
+                                                })
+                data = s.messages.map(function (element) { return element.data })
+
+                console.log ("sensor.bias" + sensor.bias)
+                values = getPayload(data, sensor.bias)
+
+                console.log(values)
+
+                for (i=0; i<samples; i++)
+                {
+                    values[i] = values[i] / 1000.0;
+                }
+                chart = new Chart(document.getElementById("line-chart1"), {
+                type: 'line',
+                data: {
+                    labels: labels.reverse(),
+                    datasets: [{ 
+                        data: values.reverse(),
+                        label: sensor.name,
+                        borderColor: "#3e95cd",
+                        fill: false
+                    }],
+                },
+                options: {
+                    title: {
+                    display: true,
+                    text: 'Målinger fra siste 24 timer (ppm))',
+                    showXLabels: 10
+                    }
+                }
+                });
+                                    
+            });
+        }
+    }
+
+});
+
+
+Vue.component('sensor', {
+  props : ['name', 'gas', 'concentration', 'temperature', 'humidity', 'rssi', 'battery', 'timestamp', 'url'],
+  template: '<div class="sensor">\
+        <h3><a v-bind:href="url">{{name}}</a></h3>\
+        <table>\
+          <tr>\
+            <td><b>Sensor</b></td>\
+            <td><b>Verdi</b></td>\
+            <td><b>Enhet</b></td>\
+          </tr>\
+          <tr>\
+            <td>{{gas}}</td>\
+            <td>{{concentration}}</td>\
+            <td>ppm</td>\
+          </tr>\
+          <tr>\
+            <td>Temp</td>\
+            <td>{{temperature}}</td>\
+            <td>&#8451;</td>\
+          </tr>\
+          <tr>\
+            <td>RH</td>\
+            <td>{{humidity}}</td>\
+            <td>%</td>\
+          </tr>\
+          <tr>\
+            <td>RSSI</td>\
+            <td>{{rssi}}</td>\
+            <td>dBm</td>\
+          </tr>\
+          <tr>\
+            <td>Batteri</td>\
+            <td>{{battery}}</td>\
+            <td>mV</td>\
+          </tr>\
+          <tr>\
+            <td>Avlest</td>\
+            <td></td>\
+            <td>{{timestamp}}</td>\
+          </tr>\
+        </table>\
+      </div>'
+})
+
+
+var chart = null;
+vm.ShowLevel1()
+
+
+var ping = 1;
+
+
+function fetchMeasurement(sensor, sensorReading)
+{
+  $.when(getSensorData(sensor.eui, 1)).then(function (s) {
+        var timestamp = s.messages.map(function (element) { timestamp = new Date(element.timestamp)
+                                          return timestamp.toLocaleDateString('no-nb') + " " +
+                                                timestamp.toLocaleTimeString('no-nb') + " " 
+                                      })
+        payload = s.messages.map(function (element) { return element.data })
+
+        values = decodePayload(payload.toString(), sensor.bias)
+
+        temperature = parseInt("0x" + payload[0].substring(8,10))
+        humidity = parseInt("0x" + payload[0].substring(10,12))
+        battery = parseInt("0x" + payload[0].substring(12,20))
+
+        var divisor = 1000.0
+
+        console.log((values)/ divisor)
+        if (sensor.gas == 'CO')
+            sensorReading.concentration = Math.round((values)/ divisor)
+        else
+            sensorReading.concentration = Math.round(100*(values)/ divisor)/100
+
+        sensorReading.timestamp = timestamp
+        sensorReading.temperature = temperature
+        sensorReading.humidity = humidity
+        sensorReading.rssi = s.messages[0].rssi
+        sensorReading.battery = battery
+
+        console.log(sensorReading.concentration)
+    });
+}
+
+
+
+function getSensorData(device, count) {
+  var x_api_token = getToken()
+
+  var sensorData 
+  return $.ajax({
+           url: "https://api.lora.telenor.io/applications/00-09-09-00-00-00-03-56/devices/" + device + "/data?limit=" + count,
+           type: "GET",
+           data: sensorData,
+           headers: {
+              "X-API-Token":x_api_token
+           },
+            dataType: 'json',
+        });
+ }
+
+function decodePayload(payload, bias) {
+  var averaged = 0.0
+  var values = new Array()
+  if (payload.length == 20) {
+      measurement = parseInt("0x" + payload.substring(0,8));
+      if ((measurement & 0x80000000) < 0) {
+        measurement = measurement - 0x100000000;
+      }
+
+      values.push(measurement - bias)
+  }
+
+  return values
+}
+
+
+function getPayload(sensorData, bias) {
+  var values = new Array()
+  for (var i=0; i<sensorData.length; i++) {
+    values = values.concat(decodePayload(sensorData[i], bias))
+  }
+  return values
+}
+
+</script>
+  </body>
+</html>

@@ -14,4 +14,7 @@
 **  limitations under the License.
 */
 
+void startSampleData();
+void stopSampleData();
+void DecodeBuffer(char * buffer);
 void init_spec_sensor();
